@@ -12,10 +12,15 @@ def login(user, password):
     auth(user, password)
 
 
-def getData(security, startDate, endDate, frequency, skipPaused):
+def getData():
     global dataNum
     global trainNum
     global testNum
+    global security
+    global startDate
+    global endDate
+    global frequency
+    global skipPaused
     raw = get_price(security=security, start_date=startDate, end_date=endDate, frequency=frequency,
                     skip_paused=skipPaused)
     # 总数据组数(实际数据组数-1，因为抛弃了一组数据)
@@ -51,7 +56,7 @@ def cleanData(dataNum, trainData, mode="train"):
         roll = raw[i:i + 1]
         # 股价
         dataY = []
-        dataY.append(roll.loc[:, ["money"]].values[0][0] / roll.loc[:, ["volume"]].values[0][0])
+        dataY.append(roll.loc[:, ["close"]].values[0][0])
         if mode == "train":
             if i < trainNum + 1:
                 Y.append(dataY)
@@ -59,6 +64,7 @@ def cleanData(dataNum, trainData, mode="train"):
                 testY.append(dataY)
         elif mode == "test":
             testY.append(dataY)
+        # orgY是提前一天之后的值
         orgY.append(dataY)
     # 归一化
     '''缩放至[0,1]'''
@@ -84,6 +90,9 @@ def outputData():
     global testY
     global result
     global score
+    global security
+    global startDate
+    global endDate
     # 数据输出
     print("X:")
     print(X)
@@ -97,6 +106,7 @@ def outputData():
     print("result:")
     print(result)
     print(score)
+    raw.to_csv(security+" "+startDate+" "+endDate+".csv")
 
 
 def drawPlot(mode="train"):
@@ -104,11 +114,11 @@ def drawPlot(mode="train"):
     plt.figure(figsize=(2 * 19.2, 2 * 10.8))
     # plt.plot(range(0+trainNum,testY.shape[0]+trainNum),testY,marker=".",linewidth=3,linestyle="-",color="blue")
     '''前面的数据处理过程中Y被提前了一天，此处画图时是时间轴对应的某天当天的股票，所以应延迟一天'''
-    plt.plot(range(0 + 1, dataNum + 1), orgY, marker=".", linewidth=1, linestyle="-", color="blue")
+    plt.plot(range(0+1, dataNum+1 ), orgY, marker=".", linewidth=1, linestyle="-", color="blue")
     if mode=="train":
-        plt.plot(range(trainNum, dataNum), result, marker="x", linewidth=1, linestyle="--", color="orange")
+        plt.plot(range(trainNum+1, dataNum+1), result, marker="x", linewidth=1, linestyle="--", color="orange")
     elif mode=="test":
-        plt.plot(range(0, dataNum), result, marker="x", linewidth=1, linestyle="--", color="orange")
+        plt.plot(range(0+1, dataNum+1), result, marker="x", linewidth=1, linestyle="--", color="orange")
     plt.xticks(range(0, dataNum), dateList, rotation=45)
     plt.grid(True)
     # plt.title("params=" + str(clf.best_params_) + "    Score=" + str(score))
@@ -170,8 +180,7 @@ testNum = 0
 scaler = preprocessing.MinMaxScaler()
 
 login(user, password)
-raw = getData(security, startDate, endDate, frequency, skipPaused)
-# raw.to_csv("data.csv")
+raw = getData()
 cleanData(dataNum, trainNum)
 # 参数设置
 C = 50000
@@ -187,7 +196,9 @@ outputData()
 drawPlot()
 
 _init_()
-getData(security, "2018-01-01", "2019-01-01", frequency, skipPaused)
+startDate="2018-01-01"
+endDate="2019-02-01"
+raw=getData()
 cleanData(dataNum, trainNum, mode)
 # 进行预测
 result = clf.predict(testX)
