@@ -13,12 +13,21 @@ def login(user, password):
 
 
 def getData(security, startDate, endDate, frequency, skipPaused):
+    global dataNum
+    global trainNum
+    global testNum
     raw = get_price(security=security, start_date=startDate, end_date=endDate, frequency=frequency,
                     skip_paused=skipPaused)
+    # 总数据组数(实际数据组数-1，因为抛弃了一组数据)
+    dataNum = raw.shape[0] - 1
+    # 训练数据组数
+    trainNum = (2 * dataNum) // 3
+    # 总测试数据组数
+    testNum = dataNum - trainNum
     return raw
 
 
-def cleanData(dataNum, trainData):
+def cleanData(dataNum, trainData, mode="train"):
     global X
     global testX
     global testY
@@ -30,9 +39,12 @@ def cleanData(dataNum, trainData):
         dateList.append(str(roll.index.values[0])[:10])
         dataX = roll.drop(["open", "volume", "money"], axis=1)
         # dataX = dataX.drop(dataX.columns[0:1],axis=1)
-        if i < trainNum:
-            X.append(dataX.values.tolist()[0])
-        else:
+        if mode == "train":
+            if i < trainNum:
+                X.append(dataX.values.tolist()[0])
+            else:
+                testX.append(dataX.values.tolist()[0])
+        elif mode == "test":
             testX.append(dataX.values.tolist()[0])
     # 处理原始数据Y，相对于X后错一天，意味着丢弃最后一个X和第0个Y
     for i in range(1, dataNum + 1):
@@ -40,9 +52,12 @@ def cleanData(dataNum, trainData):
         # 股价
         dataY = []
         dataY.append(roll.loc[:, ["money"]].values[0][0] / roll.loc[:, ["volume"]].values[0][0])
-        if i < trainNum + 1:
-            Y.append(dataY)
-        else:
+        if mode == "train":
+            if i < trainNum + 1:
+                Y.append(dataY)
+            else:
+                testY.append(dataY)
+        elif mode == "test":
             testY.append(dataY)
         orgY.append(dataY)
     # 归一化
@@ -54,22 +69,87 @@ def cleanData(dataNum, trainData):
     # testY= Normalizer().fit(testY).transform(testY)
     # orgY= Normalizer().fit(orgY).transform(orgY)
     '''
-    X = scaler.fit_transform(X)
-    testX = scaler.transform(testX)
-    Y = scaler.fit_transform(Y)
-    testY = scaler.transform(testY)
-    orgY = scaler.transform(orgY)
+    if mode == "train":
+        X = scaler.fit_transform(X)
+        Y = scaler.fit_transform(Y)
+    testX = scaler.fit_transform(testX)
+    testY = scaler.fit_transform(testY)
+    orgY = scaler.fit_transform(orgY)
+
+
+def outputData():
+    global X
+    global Y
+    global testX
+    global testY
+    global result
+    global score
+    # 数据输出
+    print("X:")
+    print(X)
+    print("Y:")
+    print(Y)
+    print("testX:")
+    print(testX)
+    print("testY")
+    print(testY)
+    # 结果输出
+    print("result:")
+    print(result)
+    print(score)
+
+
+def drawPlot(mode="train"):
+    # 绘图
+    plt.figure(figsize=(2 * 19.2, 2 * 10.8))
+    # plt.plot(range(0+trainNum,testY.shape[0]+trainNum),testY,marker=".",linewidth=3,linestyle="-",color="blue")
+    '''前面的数据处理过程中Y被提前了一天，此处画图时是时间轴对应的某天当天的股票，所以应延迟一天'''
+    plt.plot(range(0 + 1, dataNum + 1), orgY, marker=".", linewidth=1, linestyle="-", color="blue")
+    if mode=="train":
+        plt.plot(range(trainNum, dataNum), result, marker="x", linewidth=1, linestyle="--", color="orange")
+    elif mode=="test":
+        plt.plot(range(0, dataNum), result, marker="x", linewidth=1, linestyle="--", color="orange")
+    plt.xticks(range(0, dataNum), dateList, rotation=45)
+    plt.grid(True)
+    # plt.title("params=" + str(clf.best_params_) + "    Score=" + str(score))
+    plt.title("params=" + str(clf.best_params_) + "    Score=" + str(score))
+    # print(clf.gamma)
+    plt.legend(["Real", "Predict"], loc="upper right")
+    plt.show()
+
+
+def _init_():
+    global X
+    global Y
+    global testX
+    global testY
+    global result
+    global score
+    global orgY
+    global dateList
+    global dataNum
+    global trainNum
+    global testNum
+    X = []
+    Y = []
+    testX = []
+    testY = []
+    orgY = []
+    result = []
+    dateList = []
+    dataNum = 0
+    trainNum = 0
+    testNum = 0
 
 
 user = '13074581737'
 password = 'trustno1'
 security = "600779.XSHG"
 startDate = "2015-01-01"
-endDate = "2019-02-14"
+endDate = "2017-02-14"
 frequency = "1d"
 skipPaused = True
-login(user, password)
-raw = getData(security, startDate, endDate, frequency, skipPaused)
+mode="test"
 # 训练用X和Y
 X = []
 Y = []
@@ -81,59 +161,37 @@ orgY = []
 # 储存实际日期
 dateList = []
 # 总数据组数(实际数据组数-1，因为抛弃了一组数据)
-dataNum = raw.shape[0] - 1
+dataNum = 0
 # 训练数据组数
-trainNum = (2 * dataNum) // 3
+trainNum = 0
 # 总测试数据组数
-testNum = dataNum - trainNum
+testNum = 0
 # 声明归一化对象
 scaler = preprocessing.MinMaxScaler()
 
-
+login(user, password)
+raw = getData(security, startDate, endDate, frequency, skipPaused)
 # raw.to_csv("data.csv")
-
-cleanData(dataNum,trainNum)
-
-# 数据输出
-print("X:")
-print(X)
-print("Y:")
-print(Y)
-print("testX:")
-print(testX)
-print("testY")
-print(testY)
+cleanData(dataNum, trainNum)
 # 参数设置
 C = 50000
-# 模型训练
-# clf = svm.SVR(kernel='rbf', gamma='auto', C=C)
+# 参数择优
 clf = GridSearchCV(svm.SVR(kernel="rbf"), param_grid={"C": np.logspace(-5, 5, 2), "gamma": np.logspace(-5, 5, 2)})
+# 模型训练
 clf.fit(X, Y)
 # 进行预测
 result = clf.predict(testX)
-
-# 结果输出
-print("result:")
-print(result)
-'''
-realY = []
-for i in testY:
-    realY.append(i[0])
-'''
 # 结果评分并输出
 score = mean_absolute_error(result, testY)
-print(score)
+outputData()
+drawPlot()
 
-# 绘图
-plt.figure(figsize=(2 * 19.2, 2 * 10.8))
-# plt.plot(range(0+trainNum,testY.shape[0]+trainNum),testY,marker=".",linewidth=3,linestyle="-",color="blue")
-'''前面的数据处理过程中Y被提前了一天，此处画图时是时间轴对应的某天当天的股票，所以应延迟一天'''
-plt.plot(range(0 + 1, dataNum + 1), orgY, marker=".", linewidth=1, linestyle="-", color="blue")
-plt.plot(range(trainNum, dataNum), result, marker="x", linewidth=1, linestyle="--", color="orange")
-plt.xticks(range(0, dataNum), dateList, rotation=45)
-plt.grid(True)
-# plt.title("params=" + str(clf.best_params_) + "    Score=" + str(score))
-plt.title("params=" + str(clf.best_params_) + "    Score=" + str(score))
-# print(clf.gamma)
-plt.legend(["Real", "Predict"], loc="upper right")
-plt.show()
+_init_()
+getData(security, "2018-01-01", "2019-01-01", frequency, skipPaused)
+cleanData(dataNum, trainNum, mode)
+# 进行预测
+result = clf.predict(testX)
+# 结果评分并输出
+score = mean_absolute_error(result, testY)
+outputData()
+drawPlot(mode)
