@@ -29,6 +29,9 @@ def getData():
     trainNum = (2 * dataNum) // 3
     # 总测试数据组数
     testNum = dataNum - trainNum
+    if dataNum==0 or trainNum==0 or testNum==0:
+        print("数据量过少！！")
+        SystemExit
     return raw
 
 
@@ -38,11 +41,14 @@ def cleanData(dataNum, trainData, mode="train"):
     global testY
     global Y
     global orgY
+    # 处理日期数据
+    for i in range(0,dataNum+1):
+        roll = raw[i:i + 1]
+        dateList.append(str(roll.index.values[0])[:10])
     # 处理原数数据X，丢弃最后一个X
     for i in range(0, dataNum):
         roll = raw[i:i + 1]
-        dateList.append(str(roll.index.values[0])[:10])
-        dataX = roll.drop(["open", "volume", "money"], axis=1)
+        dataX = roll.drop(["open", "close","volume", "money"], axis=1)
         # dataX = dataX.drop(dataX.columns[0:1],axis=1)
         if mode == "train":
             if i < trainNum:
@@ -75,6 +81,15 @@ def cleanData(dataNum, trainData, mode="train"):
     # testY= Normalizer().fit(testY).transform(testY)
     # orgY= Normalizer().fit(orgY).transform(orgY)
     '''
+    print("rawData:")
+    print("rawX")
+    print(X)
+    print("rawY")
+    print(Y)
+    print("rawTestX")
+    print(testX)
+    print("rawTestY")
+    print(testY)
     if mode == "train":
         X = scaler.fit_transform(X)
         Y = scaler.fit_transform(Y)
@@ -155,11 +170,11 @@ def _init_():
 user = '13074581737'
 password = 'trustno1'
 security = "600779.XSHG"
-startDate = "2015-01-01"
-endDate = "2017-02-14"
+startDate = "2015-09-01"
+endDate = "2015-12-16"
 frequency = "1d"
 skipPaused = True
-mode="test"
+mode="train"
 # 训练用X和Y
 X = []
 Y = []
@@ -181,7 +196,7 @@ scaler = preprocessing.MinMaxScaler()
 
 login(user, password)
 raw = getData()
-cleanData(dataNum, trainNum)
+cleanData(dataNum, trainNum,mode)
 # 参数设置
 C = 50000
 # 参数择优
@@ -193,11 +208,14 @@ result = clf.predict(testX)
 # 结果评分并输出
 score = mean_absolute_error(result, testY)
 outputData()
-drawPlot()
+drawPlot(mode)
+
+
 
 _init_()
-startDate="2018-01-01"
-endDate="2019-02-01"
+startDate="2015-11-13"
+endDate="2015-12-16"
+mode="test"
 raw=getData()
 cleanData(dataNum, trainNum, mode)
 # 进行预测
